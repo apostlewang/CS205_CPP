@@ -39,6 +39,21 @@ Matrix generator(int m, int n){
     return myMatrix;
     
 }
+
+Matrix transpose(Matrix b){
+    int kk = b.num_rows;
+    int jj = b.num_colums;
+    float* colums = new float[kk*jj];
+    Matrix bt = Matrix(jj,kk);
+    for(int i=0; i<kk*jj; i++){
+        int row = i/jj;
+        int colum = i%jj;
+        colums[colum*kk+row] = b.data[i];
+    }
+    bt.data = colums;å
+    return bt;
+}
+
 void showMatrix(Matrix c){
     int m,n;
     m = c.num_rows;
@@ -120,19 +135,14 @@ Matrix multiMatrix4(Matrix &a, Matrix &b){
     return result;
 }
 
-Matrix multiMatrix5(Matrix &a, Matrix &b){
-    assert (a.num_colums == b.num_rows);
+Matrix multiMatrix5(Matrix &a, Matrix &bt){
+    assert (a.num_colums == bt.num_colums);
     int ii = a.num_rows;
     int kk = a.num_colums;
-    int jj = b.num_colums;
+    int jj = bt.num_rows;
     assert(ii%8==0 && jj%8==0);
     Matrix result = Matrix(ii,jj);
-    float* colums = new float[kk*jj];
-    for(int i=0; i<kk*jj; i++){
-        int row = i/jj;
-        int colum = i%jj;
-        colums[colum*kk+row] = b.data[i];
-    }
+    float* colums = bt.data;
     #pragma omp parallel for
     for(int i=0; i<ii; i++){
         for(int j=0 ; j<jj; j++){
@@ -150,53 +160,43 @@ Matrix multiMatrix5(Matrix &a, Matrix &b){
 
     return result;
 }
-Matrix multiMatrix6(Matrix &a, Matrix &b){
-    assert (a.num_colums == b.num_rows);
+Matrix multiMatrix6(Matrix &a, Matrix &bt){
+    assert (a.num_colums == bt.num_colums);
     int ii = a.num_rows;
     int kk = a.num_colums;
-    int jj = b.num_colums;
+    int jj = bt.num_rows;
     Matrix result = Matrix(ii,jj);
-    float* colums = new float[kk*jj];
-    for(int i=0; i<kk*jj; i++){
-        int row = i/jj;
-        int colum = i%jj;
-        colums[colum*kk+row] = b.data[i];
-    }
+    float* colums = bt.data;
+
     #pragma omp parallel for
     for(int i=0; i<ii; i++){
         for(int j=0 ; j<jj; j++){
             float sum = 0;
             for(int k=0; k<kk; k++){
-                sum += colums[j+kk]*a.data[i*kk+k];
+                sum += colums[j*kk+k]*a.data[i*kk+k];
             }
-    
             result.data[i*jj+j] = sum;
         }
     }
 
     return result;
 }
-Matrix multiMatrix7(Matrix &a, Matrix &b){
-    assert (a.num_colums == b.num_rows);
+Matrix multiMatrix7(Matrix &a, Matrix &bt){
+    assert (a.num_colums == bt.num_colums);
     int ii = a.num_rows;
     int kk = a.num_colums;
-    int jj = b.num_colums;
+    int jj = bt.num_rows;
     assert(ii%4==0 && jj%4==0);
     Matrix result = Matrix(ii,jj);
-    float* colums = new float[kk*jj];
+    float* colums = bt.data;
     
-    for(int i=0; i<kk*jj; i++){
-        int row = i/jj;
-        int colum = i%jj;
-        colums[colum*kk+row] = b.data[i];
-    }
     #pragma omp parallel for
     for(int i=0; i<ii; i+=4){
         for(int j=0 ; j<jj; j+=4){           
             register float t0(0),t1(0),t2(0),t3(0),t4(0),t5(0),t6(0),t7(0),
                     t8(0),t9(0),t10(0),t11(0),t12(0),t13(0),t14(0),t15(0);
             float *a0(a.data+i*kk) ,*a1(a.data+(i+1)*kk), *a2(a.data+(i+2)*kk), *a3(a.data+(i+3)*kk);
-            float *b0(b.data+j*kk) ,*b1(b.data+(j+1)*kk) , *b2(b.data+(j+2)*kk), *b3(b.data+(j+3)*kk);
+            float *b0(colums+j*kk) ,*b1(colums+(j+1)*kk) , *b2(colums+(j+2)*kk), *b3(colums+(j+3)*kk);
             for(int k=0; k<kk; k+=1){
                 t0+=*(a0)**(b0);
                 t1+=*(a0)**(b1);
@@ -243,6 +243,7 @@ void testSmall(int x, int y, int z){
     auto duration = 0L;
     Matrix a = generator(x,y);
     Matrix b = generator(y,z);
+    Matrix bt = transpose(b);
     Matrix c = Matrix(x,z);
 
     TIME_START
@@ -270,15 +271,15 @@ void testSmall(int x, int y, int z){
     TIME_END("V4(ikj+omp)")
 
     TIME_START
-    c = multiMatrix5(a,b);
+    c = multiMatrix5(a,bt);
     TIME_END("V5(tanspose+SIMD)")
 
     TIME_START
-    c = multiMatrix6(a,b);
+    c = multiMatrix6(a,bt);
     TIME_END("V6(transpose)")
 
     TIME_START
-    c = multiMatrix7(a,b);
+    c = multiMatrix7(a,bt);
     TIME_END("V7(16registers+omp)")
 
 }
@@ -289,6 +290,7 @@ void testLarge(int x, int y, int z){
     Matrix a = generator(x,y);
     Matrix b = generator(y,z);
     Matrix c = Matrix(x,z);
+    Matrix bt = transpose(b);
 
     TIME_START
     cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,x,z,y,1.0,a.data,y,b.data,z,0.0,c.data,z);
@@ -299,7 +301,7 @@ void testLarge(int x, int y, int z){
     TIME_END("V4(ikj+omp)")
 
     TIME_START
-    c = multiMatrix5(a,b);
+    c = multiMatrix5(a,bt);
     TIME_END("V5(tanspose+SIMD)")
 }
 
