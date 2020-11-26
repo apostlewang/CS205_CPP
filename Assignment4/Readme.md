@@ -8,7 +8,7 @@ SID: 11510815
 
 ## Part 1. Source Code
 
-https://github.com/apostlewang/CS205_CPP/tree/master/Assigment4
+https://github.com/apostlewang/CS205_CPP/tree/master/Assignment4
 
 ## Part 2. Result & Verification
 
@@ -46,7 +46,43 @@ public:
 
 ### 2.Constructors, destructor, operators overloading
 
-operator = 赋值运算符重载
+#### Constructors
+
+```cpp
+Matrix::Matrix(int num_rows, int num_columns, float* data){
+    this->num_columns = num_columns;
+    this->num_rows = num_rows;
+    this->data = data;
+    this->refcount = new int(0);
+}
+
+Matrix::Matrix(const Matrix &m){
+    this->num_columns = m.num_columns;
+    this->num_rows = m.num_rows;
+    this->data = m.data;
+    this->refcount = m.refcount;
+    *refcount += 1;
+}
+```
+
+两种构造方法，第一种通过传入行数，列数和数据的指针构造（参考opencv的实现，浅拷贝），第二种是copy方式构造，值得注意的是这里的data也是共享的，被多一个对象指向后对应的refcount就增加1。
+
+#### Destructor
+
+```cpp
+Matrix::~Matrix(){
+    if(*refcount == 0){
+        delete []data;
+    }
+    else{
+        *refcount -= 1;
+    }   
+}
+```
+
+只有当某块数据区域的refcount为0时才会删除这块数据释放内存，否则只对refcount指向的数值减去1。
+
+#### operator = 
 
 ```cpp
 Matrix& Matrix::operator= (const Matrix &m){    
@@ -55,7 +91,7 @@ Matrix& Matrix::operator= (const Matrix &m){
     }
     this->num_columns = m.num_columns;
     this->num_rows = m.num_rows;
-    if(this->refcount == 0){
+    if(*(this->refcount) == 0){
         delete [] this->data;
     }
     else{
@@ -68,7 +104,9 @@ Matrix& Matrix::operator= (const Matrix &m){
 }
 ```
 
-operator << 重载赋值运算符
+前面的if判断可以避免某个对象赋值给自身，之后对于被赋值的对象，行数列数可以直接对应拷贝，接着因为该对象原来的数据区域将不再被它引用，判断其refcount是否为0，若为0则释放内存，否则refount减去1。
+
+#### operator <<
 
 ```c++
 ostream& operator<<(ostream &os,const Matrix &m){
@@ -85,7 +123,18 @@ ostream& operator<<(ostream &os,const Matrix &m){
 }
 ```
 
+重载输出，打印矩阵。
 
+#### operator ()
+
+```cpp
+float Matrix::operator() (int row, int column) const{
+    assert(row < this->num_rows && column < this->num_columns && row >= 0 && column >= 0);      
+    return data[row*num_columns+column];
+}
+```
+
+输出对应位置的元素（序号从0开始）。
 
 ### 3.Operator * overloading
 
@@ -116,6 +165,10 @@ Matrix operator* (const float a,const Matrix &m){
 }
 ```
 
+第一个矩阵乘矩阵，主要乘法运算由multiMatrix函数提供，计算完成后构造结果对应的矩阵并返回。
+
+第二个和第三个类似，标量乘矩阵，对应元素相乘即可，不同的是一个是类的成员函数，一个是友元函数。
+
 在main中验证三种重载运算符“*”的代码：
 
 ```c++
@@ -126,15 +179,17 @@ Matrix operator* (const float a,const Matrix &m){
     cout << "C*D:" << endl << C*D;
 ```
 
+运行结果均正确。
+
 ### 4.Compile and run the program on an ARM development board
 
-在树莓派上的运行截图如下：
+在树莓派上的运行（ssh连接后操作）截图如下：
 
 <img src="./images/armrun.png" alt="image" style="zoom:50%;" />
 
 ### 5.Host in Github
 
-https://github.com/apostlewang/CS205_CPP/tree/master/Assigment4
+https://github.com/apostlewang/CS205_CPP/tree/master/Assignment4
 
 ### 6.Use Cmake to manage code
 
@@ -145,3 +200,4 @@ project(mymatrix)
 add_executable(matrix main.cpp Matrix.cpp)
 ```
 
+使用cmake CMakeLists.txt即可生成makefile，执行make命令编译程序。
