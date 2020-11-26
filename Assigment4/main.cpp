@@ -30,5 +30,7 @@ int main(){
     //Reload assignment operator
     C = A;
     cout << "C=A:" << endl << C;
+    //Reload () operator
+    cout << "C(1,3) = "<<C(1,3)<< endl;
     return 0;
 }
