@@ -65,7 +65,7 @@ Matrix& Matrix::operator= (const Matrix &m){
     }
     this->num_columns = m.num_columns;
     this->num_rows = m.num_rows;
-    if(this->refcount == 0){
+    if(*(this->refcount) == 0){
         delete [] this->data;
     }
     else{
